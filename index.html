@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Carpet Layout Optimizer</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="shell">
+    <section class="hero">
+      <p class="eyebrow">Carpet fitting planner</p>
+      <h1>Choose the cleaner layout before you cut.</h1>
+      <p class="lead">
+        Enter the room size and the carpet pieces you already have. The app compares
+        horizontal and vertical fixing directions, then ranks them by waste and cuts.
+      </p>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Job Details</h2>
+        <p>Use one unit consistently for every measurement: feet, inches, meters, or centimeters.</p>
+      </div>
+
+      <form id="optimizer-form" class="form-grid">
+        <label>
+          <span>Area width</span>
+          <input id="room-width" type="number" min="0.01" step="0.01" value="12" required>
+        </label>
+
+        <label>
+          <span>Area length</span>
+          <input id="room-height" type="number" min="0.01" step="0.01" value="15" required>
+        </label>
+
+        <label class="unit-label">
+          <span>Measurement unit</span>
+          <input id="unit-label" type="text" value="ft" maxlength="12" placeholder="ft">
+        </label>
+
+        <div class="actions-row">
+          <button type="submit" class="primary">Analyze layout</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head row">
+        <div>
+          <h2>Available Carpet Pieces</h2>
+          <p>Add each carpet size you have in stock. Quantity lets you repeat the same size.</p>
+        </div>
+        <button id="add-piece" type="button" class="secondary">Add piece</button>
+      </div>
+
+      <div class="table-shell">
+        <table>
+          <thead>
+            <tr>
+              <th>Width</th>
+              <th>Length</th>
+              <th>Quantity</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="pieces-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="results" class="results hidden" aria-live="polite">
+      <article id="recommendation-card" class="recommendation-card"></article>
+      <div class="comparison-grid">
+        <article id="horizontal-card" class="result-card"></article>
+        <article id="vertical-card" class="result-card"></article>
+      </div>
+      <article class="panel note-panel">
+        <h2>Layout Model</h2>
+        <p>
+          This version treats each selected carpet piece as one full-span strip across the room in the chosen
+          direction. It minimizes waste first, then reduces cuts. It does not join multiple pieces to create one strip.
+        </p>
+      </article>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
