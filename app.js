@@ -9,9 +9,11 @@ const horizontalCard = document.getElementById("horizontal-card");
 const verticalCard = document.getElementById("vertical-card");
 
 bootstrapRows();
-runAnalysis();
+runAnalysis(true);
 
 addPieceButton.addEventListener("click", () => addPieceRow());
+form.addEventListener("input", () => runAnalysis(true));
+piecesBody.addEventListener("input", () => runAnalysis(true));
 piecesBody.addEventListener("click", (event) => {
   if (!event.target.classList.contains("remove-piece")) {
     return;
@@ -34,13 +36,15 @@ piecesBody.addEventListener("click", (event) => {
 
 form.addEventListener("submit", (event) => {
   event.preventDefault();
-  runAnalysis();
+  runAnalysis(false);
 });
 
-function runAnalysis() {
+function runAnalysis(silentInvalid = false) {
   const payload = collectInputs();
   if (!payload.ok) {
-    renderError(payload.message);
+    if (!silentInvalid) {
+      renderError(payload.message);
+    }
     return;
   }
 
@@ -50,16 +54,15 @@ function runAnalysis() {
 }
 
 function bootstrapRows() {
-  addPieceRow({ width: 12, length: 15, quantity: 1 });
-  addPieceRow({ width: 6, length: 15, quantity: 1 });
+  addPieceRow();
 }
 
 function addPieceRow(defaults = {}) {
   const row = document.createElement("tr");
   row.innerHTML = [
-    '<td><input class="piece-width" type="number" min="0.01" step="0.01" required></td>',
-    '<td><input class="piece-length" type="number" min="0.01" step="0.01" required></td>',
-    '<td><input class="piece-quantity" type="number" min="1" step="1" value="1" required></td>',
+    '<td data-label="Width"><input class="piece-width" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="12" required></td>',
+    '<td data-label="Length"><input class="piece-length" type="number" min="0.01" step="0.01" inputmode="decimal" placeholder="15" required></td>',
+    '<td data-label="Quantity"><input class="piece-quantity" type="number" min="1" step="1" value="1" inputmode="numeric" required></td>',
     '<td><button type="button" class="icon-button remove-piece">Remove</button></td>'
   ].join("");
 
@@ -523,6 +526,8 @@ function renderDiagram(result, unit) {
   const roomX = padding;
   const roomY = padding;
   const isHorizontal = result.name === "Horizontal";
+  const stripPixelSizes = layout.strips.map((strip) => strip.usedCross * scale);
+  const compactMode = layout.strips.length > 6 || Math.min(...stripPixelSizes, Infinity) < 28;
 
   let offset = 0;
   const stripMarkup = layout.strips.map((strip, index) => {
@@ -543,10 +548,21 @@ function renderDiagram(result, unit) {
         ? `<line x1="${roomX + 6}" y1="${y}" x2="${roomX + roomPixelWidth - 6}" y2="${y}" class="seam-line" />`
         : `<line x1="${x}" y1="${roomY + 6}" x2="${x}" y2="${roomY + roomPixelHeight - 6}" class="seam-line" />`
       : "";
-    const cutBadge = strip.spanTrim || strip.crossTrim > 0
+    const cutBadge = !compactMode && (strip.spanTrim || strip.crossTrim > 0)
       ? renderCutBadge(strip, x, y, width, height, unit, isHorizontal)
       : "";
     const textClass = width < 80 || height < 44 ? "piece-label small" : "piece-label";
+    const labelMarkup = compactMode
+      ? renderCompactStripLabel(strip, x, y, width, height, isHorizontal)
+      : `
+        <rect x="${Math.max(x + 8, x + width / 2 - 34)}" y="${Math.max(y + 8, y + height / 2 - 15)}" width="68" height="30" rx="15" fill="${palette.badge}" fill-opacity="0.9"></rect>
+        <text x="${labelX}" y="${labelY - 4}" text-anchor="middle" dominant-baseline="middle" class="${textClass}">
+          Piece ${strip.id}
+        </text>
+        <text x="${labelX}" y="${labelY + 10}" text-anchor="middle" dominant-baseline="middle" class="piece-meta">
+          ${formatNumber(strip.usedCross)} ${unit}
+        </text>
+      `;
 
     offset += strip.usedCross;
 
@@ -555,13 +571,7 @@ function renderDiagram(result, unit) {
         ${seamLine}
         <rect x="${x}" y="${y}" width="${Math.max(width, 2)}" height="${Math.max(height, 2)}" rx="14" fill="${palette.fill}" fill-opacity="0.9" class="strip-block"></rect>
         ${trimLine}
-        <rect x="${Math.max(x + 8, x + width / 2 - 34)}" y="${Math.max(y + 8, y + height / 2 - 15)}" width="68" height="30" rx="15" fill="${palette.badge}" fill-opacity="0.9"></rect>
-        <text x="${labelX}" y="${labelY - 4}" text-anchor="middle" dominant-baseline="middle" class="${textClass}">
-          Piece ${strip.id}
-        </text>
-        <text x="${labelX}" y="${labelY + 10}" text-anchor="middle" dominant-baseline="middle" class="piece-meta">
-          ${formatNumber(strip.usedCross)} ${unit}
-        </text>
+        ${labelMarkup}
         ${cutBadge}
       </g>
     `;
@@ -596,8 +606,11 @@ function renderDiagram(result, unit) {
       </svg>
       <div class="diagram-legend">${legendItems}</div>
       <p class="diagram-caption">
-        Read the layout from top to bottom for horizontal fixing, or left to right for vertical fixing.
+        ${compactMode
+          ? "Compact view is used because this layout has many strips. Read the detailed strip list below."
+          : "Read the layout from top to bottom for horizontal fixing, or left to right for vertical fixing."}
       </p>
+      ${compactMode ? renderStripSummary(layout.strips, unit) : ""}
     </div>
   `;
 }
@@ -621,5 +634,46 @@ function renderCutBadge(strip, x, y, width, height, unit, isHorizontal) {
       <rect x="${badgeX}" y="${badgeY}" width="${badgeWidth}" height="${badgeHeight}" rx="11" class="cut-badge"></rect>
       <text x="${badgeX + badgeWidth / 2}" y="${badgeY + 14}" text-anchor="middle" class="cut-badge-text">${parts.join(" | ")}</text>
     </g>
+  `;
+}
+
+function renderCompactStripLabel(strip, x, y, width, height, isHorizontal) {
+  const badgeSize = 20;
+  const badgeX = x + 6;
+  const badgeY = y + 6;
+
+  if ((isHorizontal && height < 18) || (!isHorizontal && width < 18)) {
+    return "";
+  }
+
+  return `
+    <g>
+      <rect x="${badgeX}" y="${badgeY}" width="${badgeSize}" height="${badgeSize}" rx="10" class="compact-id-badge"></rect>
+      <text x="${badgeX + badgeSize / 2}" y="${badgeY + 13}" text-anchor="middle" class="compact-id-text">${strip.id}</text>
+    </g>
+  `;
+}
+
+function renderStripSummary(strips, unit) {
+  return `
+    <div class="strip-summary">
+      ${strips.map((strip) => {
+        const notes = [];
+        if (strip.spanTrim) {
+          notes.push("span trim");
+        }
+        if (strip.crossTrim > 0) {
+          notes.push(`${formatNumber(strip.crossTrim)} ${unit} offcut`);
+        }
+
+        return `
+          <div class="strip-chip">
+            <strong>Piece ${strip.id}</strong>
+            <span>${formatNumber(strip.usedCross)} ${unit}</span>
+            ${notes.length ? `<em>${notes.join(" | ")}</em>` : ""}
+          </div>
+        `;
+      }).join("")}
+    </div>
   `;
 }
